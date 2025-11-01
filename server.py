@@ -12,31 +12,36 @@ app.config['SECRET_KEY'] = 'dargas12'
 
 # Инициализация базы данных
 def init_db():
-    conn = sqlite3.connect('users.db', check_same_thread=False)
-    c = conn.cursor()
-    
-    # Создаем таблицу пользователей
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  username TEXT UNIQUE NOT NULL,
-                  password TEXT NOT NULL,
-                  email TEXT NOT NULL,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
-    # Добавляем тестовых пользователей, если их нет
-    test_users = [
-        ('user', '123456', 'user@test.com'),
-        ('admin', 'admin', 'admin@test.com'),
-        ('test', 'test', 'test@test.com')
-    ]
-    
-    for username, password, email in test_users:
-        c.execute("INSERT OR IGNORE INTO users (username, password, email) VALUES (?, ?, ?)", 
-                 (username, password, email))
-    
-    conn.commit()
-    conn.close()
-    print("✅ Database initialized successfully!")
+    try:
+        conn = sqlite3.connect('users.db', check_same_thread=False)
+        c = conn.cursor()
+        
+        # Создаем таблицу пользователей
+        c.execute('''CREATE TABLE IF NOT EXISTS users
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      username TEXT UNIQUE NOT NULL,
+                      password TEXT NOT NULL,
+                      email TEXT NOT NULL,
+                      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        
+        # Добавляем тестовых пользователей, если их нет
+        test_users = [
+            ('user', '123456', 'user@test.com'),
+            ('admin', 'admin', 'admin@test.com'),
+            ('test', 'test', 'test@test.com')
+        ]
+        
+        for username, password, email in test_users:
+            c.execute("INSERT OR IGNORE INTO users (username, password, email) VALUES (?, ?, ?)", 
+                     (username, password, email))
+        
+        conn.commit()
+        conn.close()
+        print("✅ Database initialized successfully!")
+        return True
+    except Exception as e:
+        print(f"❌ Database error: {e}")
+        return False
 
 # Инициализируем базу при старте
 init_db()
@@ -60,10 +65,16 @@ def token_required(f):
 def home():
     return jsonify({"message": "Auth Server with Database is running!", "status": "OK"})
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/login', methods=['POST', 'GET'])
 def login():
+    if request.method == 'GET':
+        return jsonify({"message": "Login endpoint - use POST method"})
+    
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No JSON data received'}), 400
+            
         username = data.get('username')
         password = data.get('password')
         
@@ -102,10 +113,16 @@ def login():
             'message': f'Server error: {str(e)}'
         }), 500
 
-@app.route('/api/register', methods=['POST'])
+@app.route('/api/register', methods=['POST', 'GET'])
 def register():
+    if request.method == 'GET':
+        return jsonify({"message": "Register endpoint - use POST method"})
+    
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No JSON data received'}), 400
+            
         username = data.get('username')
         password = data.get('password')
         email = data.get('email')
@@ -210,36 +227,6 @@ def get_users():
             'message': f'Error fetching users: {str(e)}'
         }), 500
 
-@app.route('/api/user/<int:user_id>', methods=['GET'])
-def get_user(user_id):
-    try:
-        conn = sqlite3.connect('users.db', check_same_thread=False)
-        c = conn.cursor()
-        c.execute("SELECT id, username, email, created_at FROM users WHERE id = ?", (user_id,))
-        user = c.fetchone()
-        conn.close()
-        
-        if user:
-            return jsonify({
-                'success': True,
-                'user': {
-                    'id': user[0],
-                    'username': user[1],
-                    'email': user[2],
-                    'created_at': user[3]
-                }
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'User not found'
-            }), 404
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'Error fetching user: {str(e)}'
-        }), 500
-
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     try:
@@ -277,8 +264,24 @@ def get_stats():
             'message': f'Error fetching stats: {str(e)}'
         }), 500
 
+@app.route('/api/test', methods=['GET'])
+def test():
+    return jsonify({
+        'success': True,
+        'message': 'API is working!',
+        'endpoints': ['/api/login', '/api/register', '/api/profile', '/api/users', '/api/stats']
+    })
+
 if __name__ == '__main__':
     print("🚀 Starting Auth Server with Database...")
     print("📊 Database: users.db")
     print("🌐 Server running on http://0.0.0.0:5000")
+    print("✅ Available endpoints:")
+    print("   GET  /")
+    print("   POST /api/login")
+    print("   POST /api/register") 
+    print("   GET  /api/profile")
+    print("   GET  /api/users")
+    print("   GET  /api/stats")
+    print("   GET  /api/test")
     app.run(host='0.0.0.0', port=5000, debug=True)
